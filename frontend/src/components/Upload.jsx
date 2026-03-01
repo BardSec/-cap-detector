@@ -28,13 +28,20 @@ export default function Upload() {
     form.append('file', file)
 
     try {
+      // Do NOT set Content-Type manually — axios detects FormData and lets the
+      // browser attach the correct multipart boundary automatically.
       const { data } = await api.post('/captures', form, {
-        headers: { 'Content-Type': 'multipart/form-data' },
         onUploadProgress: (e) => setProgress(Math.round((e.loaded * 100) / (e.total || 1))),
       })
       navigate(`/capture/${data.id}`)
     } catch (err) {
-      setError(err.response?.data?.detail || 'Upload failed. Please try again.')
+      const detail = err.response?.data?.detail
+      const message = !detail
+        ? 'Upload failed — server did not respond. Is the backend running?'
+        : Array.isArray(detail)
+          ? detail.map(d => d.msg || JSON.stringify(d)).join('; ')
+          : String(detail)
+      setError(message)
       setUploading(false)
     }
   }, [navigate])
