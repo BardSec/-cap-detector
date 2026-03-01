@@ -1,0 +1,152 @@
+import { useEffect, useState } from 'react'
+import { useParams, Link } from 'react-router-dom'
+import api from '../api/client'
+import C2BeaconPanel from './analyzers/C2BeaconPanel'
+import DnsTunnelPanel from './analyzers/DnsTunnelPanel'
+import NtlmPanel from './analyzers/NtlmPanel'
+import CredentialsPanel from './analyzers/CredentialsPanel'
+import ExfilPanel from './analyzers/ExfilPanel'
+
+const TABS = [
+  { id: 'c2',    label: 'C2 Beaconing',   icon: '📡', key: 'c2_beacon_count' },
+  { id: 'dns',   label: 'DNS Tunneling',   icon: '🕳️', key: 'dns_tunnel_domain_count' },
+  { id: 'ntlm',  label: 'NTLM Hashes',    icon: '🔑', key: 'ntlm_hash_count' },
+  { id: 'creds', label: 'Cleartext Creds', icon: '🚨', key: 'cleartext_cred_count' },
+  { id: 'exfil', label: 'Exfiltration',   icon: '📤', key: 'exfil_flow_count' },
+]
+
+export default function Dashboard() {
+  const { id } = useParams()
+  const [capture, setCapture] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState('c2')
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    let interval
+    const fetch = async () => {
+      try {
+        const { data } = await api.get(`/captures/${id}`)
+        setCapture(data)
+        if (data.status === 'complete' || data.status === 'failed') {
+          clearInterval(interval)
+          setLoading(false)
+        }
+      } catch {
+        setError('Could not load capture results.')
+        clearInterval(interval)
+        setLoading(false)
+      }
+    }
+
+    fetch()
+    interval = setInterval(fetch, 3000)
+    return () => clearInterval(interval)
+  }, [id])
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-full p-8">
+        <div className="text-center">
+          <p className="text-red-400 mb-4">{error}</p>
+          <Link to="/" className="text-brand-400 hover:underline text-sm">← Back to upload</Link>
+        </div>
+      </div>
+    )
+  }
+
+  if (!capture || (capture.status !== 'complete' && capture.status !== 'failed')) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full p-8 gap-6">
+        <div className="w-14 h-14 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
+        <div className="text-center">
+          <p className="text-white font-medium text-lg">Analyzing capture…</p>
+          <p className="text-gray-400 text-sm mt-1">
+            {capture?.filename} · {capture?.packet_count ? `${capture.packet_count.toLocaleString()} packets loaded` : 'Loading packets…'}
+          </p>
+          <p className="text-gray-600 text-xs mt-3">Running C2 beacon, DNS, NTLM, credential, and exfil checks</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (capture.status === 'failed') {
+    return (
+      <div className="flex flex-col items-center justify-center h-full p-8 gap-4">
+        <div className="text-5xl">⚠️</div>
+        <p className="text-red-400 font-medium">Analysis failed</p>
+        <p className="text-gray-500 text-sm">{capture.error || 'Unknown error'}</p>
+        <Link to="/" className="text-brand-400 hover:underline text-sm mt-2">← Try another file</Link>
+      </div>
+    )
+  }
+
+  const summary = capture.results?.summary || {}
+  const results = capture.results || {}
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Top bar */}
+      <div className="bg-gray-900 border-b border-gray-800 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-lg font-bold text-white truncate">{capture.filename}</h1>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {capture.packet_count?.toLocaleString()} packets
+              {capture.completed_at && ` · Analyzed ${new Date(capture.completed_at).toLocaleString()}`}
+            </p>
+          </div>
+          <a
+            href={`/api/captures/${id}/export`}
+            download
+            className="flex items-center gap-2 text-sm bg-gray-800 hover:bg-gray-700 text-gray-200 px-4 py-2 rounded-lg transition border border-gray-700"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Export JSON
+          </a>
+        </div>
+
+        {/* Summary badges */}
+        <div className="flex flex-wrap gap-2 mt-4">
+          {TABS.map(t => {
+            const count = summary[t.key] || 0
+            const hasFinding = count > 0
+            return (
+              <button
+                key={t.id}
+                onClick={() => setActiveTab(t.id)}
+                className={`
+                  flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition border
+                  ${activeTab === t.id
+                    ? 'bg-brand-600 border-brand-500 text-white'
+                    : hasFinding
+                      ? 'bg-red-900/30 border-red-700/50 text-red-300 hover:bg-red-900/50'
+                      : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'}
+                `}
+              >
+                <span>{t.icon}</span>
+                <span>{t.label}</span>
+                <span className={`
+                  px-1.5 py-0.5 rounded text-xs font-bold
+                  ${hasFinding ? 'bg-red-600 text-white' : 'bg-gray-700 text-gray-400'}
+                `}>{count}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Panel content */}
+      <div className="flex-1 overflow-y-auto p-6">
+        {activeTab === 'c2'    && <C2BeaconPanel data={results.c2_beaconing || []} />}
+        {activeTab === 'dns'   && <DnsTunnelPanel data={results.dns_tunneling || {}} />}
+        {activeTab === 'ntlm'  && <NtlmPanel data={results.ntlm_hashes || []} />}
+        {activeTab === 'creds' && <CredentialsPanel data={results.cleartext_credentials || []} />}
+        {activeTab === 'exfil' && <ExfilPanel data={results.exfiltration || []} />}
+      </div>
+    </div>
+  )
+}

@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply antialiased;
+  }
+}
+
+/* Custom scrollbar for dark theme */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { @apply bg-gray-900; }
+::-webkit-scrollbar-thumb { @apply bg-gray-600 rounded; }
+::-webkit-scrollbar-thumb:hover { @apply bg-gray-500; }
+
+/* Monospace tables */
+.mono { font-family: 'Courier New', Courier, monospace; }
