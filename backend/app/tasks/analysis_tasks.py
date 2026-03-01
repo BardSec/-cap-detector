@@ -25,6 +25,7 @@ def analyze_pcap(self, capture_id: int, file_path: str) -> None:
     from app.analyzers.exfil import analyze_exfiltration
     from app.analyzers.ntlm import analyze_ntlm
     from app.analyzers.tls_inspect import analyze_tls_inspection
+    from app.analyzers.traffic_timeline import analyze_traffic_timeline
     from app.database import SessionLocal
     from app.models import Capture
 
@@ -57,9 +58,10 @@ def analyze_pcap(self, capture_id: int, file_path: str) -> None:
         exfil_results = analyze_exfiltration(packets)
 
         # ── Network troubleshooting analyzers ─────────────────────────────────
-        conn_results  = analyze_connection_failures(packets)
-        dns_health    = analyze_dns_health(packets)
-        tls_results   = analyze_tls_inspection(packets)
+        conn_results     = analyze_connection_failures(packets)
+        dns_health       = analyze_dns_health(packets)
+        tls_results      = analyze_tls_inspection(packets)
+        timeline_results = analyze_traffic_timeline(packets)
 
         # Strip `password_raw` from in-DB results — it lives only in JSON export
         safe_creds = [
@@ -82,6 +84,7 @@ def analyze_pcap(self, capture_id: int, file_path: str) -> None:
                 "connection_failures":   conn_results,
                 "dns_health":            dns_health,
                 "tls_inspection":        tls_results,
+                "traffic_timeline":      timeline_results,
                 "packet_count":          packet_count,
                 # ── Summary counts for the dashboard header ───────────────────
                 "summary": {
@@ -105,6 +108,7 @@ def analyze_pcap(self, capture_id: int, file_path: str) -> None:
                         + tls_summary.get("alert_count", 0)
                         + tls_summary.get("mismatch_count", 0)
                     ),
+                    "conversation_count": timeline_results.get("summary", {}).get("conversation_count", 0),
                 },
             },
             default=str,

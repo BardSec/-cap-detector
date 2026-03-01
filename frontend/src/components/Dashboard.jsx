@@ -9,6 +9,7 @@ import ExfilPanel from './analyzers/ExfilPanel'
 import ConnectionFailuresPanel from './analyzers/ConnectionFailuresPanel'
 import DnsHealthPanel from './analyzers/DnsHealthPanel'
 import TlsInspectPanel from './analyzers/TlsInspectPanel'
+import TrafficTimelinePanel from './analyzers/TrafficTimelinePanel'
 
 const TAB_GROUPS = [
   {
@@ -26,9 +27,8 @@ const TAB_GROUPS = [
     tabs: [
       { id: 'conn',       label: 'Blocked Connections', icon: '🚧', key: 'blocked_dest_count' },
       { id: 'dns_health', label: 'DNS Health',           icon: '🔍', key: 'dns_failure_count' },
-      { id: 'tls',        label: 'TLS / SSL',            icon: '🔐', key: 'tls_issue_count',
-        // info-level: high count is expected when SSL inspection is deployed
-        infoStyle: true },
+      { id: 'tls',        label: 'TLS / SSL',            icon: '🔐', key: 'tls_issue_count',   infoStyle: true },
+      { id: 'timeline',   label: 'Time Analysis',        icon: '📊', key: 'conversation_count', infoStyle: true },
     ],
   },
 ]
@@ -182,8 +182,9 @@ export default function Dashboard() {
         {activeTab === 'creds'      && <CredentialsPanel data={results.cleartext_credentials || []} />}
         {activeTab === 'exfil'      && <ExfilPanel       data={results.exfiltration || []} />}
         {activeTab === 'conn'       && <ConnectionFailuresPanel data={results.connection_failures || {}} />}
-        {activeTab === 'dns_health' && <DnsHealthPanel   data={results.dns_health || {}} />}
-        {activeTab === 'tls'        && <TlsInspectPanel  data={results.tls_inspection || {}} />}
+        {activeTab === 'dns_health' && <DnsHealthPanel         data={results.dns_health || {}} />}
+        {activeTab === 'tls'        && <TlsInspectPanel        data={results.tls_inspection || {}} />}
+        {activeTab === 'timeline'   && <TrafficTimelinePanel   data={results.traffic_timeline || {}} />}
       </div>
     </div>
   )
