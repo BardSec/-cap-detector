@@ -1,3 +1,6 @@
+import logging
+import sys
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -5,8 +8,20 @@ from app.config import settings
 from app.database import Base, engine
 from app.routers import auth, uploads
 
-# Create tables on startup (use Alembic in production for migrations)
-Base.metadata.create_all(bind=engine)
+logger = logging.getLogger(__name__)
+
+# Create tables on startup (use Alembic in production for migrations).
+# If the database is unreachable the process exits with a clear message
+# rather than crashing with an opaque SQLAlchemy traceback.
+try:
+    Base.metadata.create_all(bind=engine)
+except Exception as exc:
+    logger.critical(
+        "Cannot connect to the database at startup: %s\n"
+        "Check that the postgres container is running and DATABASE_URL is correct.",
+        exc,
+    )
+    sys.exit(1)
 
 app = FastAPI(
     title="PCAP Bloodhound",

@@ -30,7 +30,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-pcapbloodhound}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-pcapbloodhound}
       - REDIS_URL=redis://redis:6379/0
-      - SECRET_KEY=${SECRET_KEY}
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-change-me-in-production}
       - MICROSOFT_CLIENT_ID=${MICROSOFT_CLIENT_ID:-}
       - MICROSOFT_CLIENT_SECRET=${MICROSOFT_CLIENT_SECRET:-}
       - MICROSOFT_TENANT_ID=${MICROSOFT_TENANT_ID:-common}
@@ -54,7 +54,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-pcapbloodhound}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-pcapbloodhound}
       - REDIS_URL=redis://redis:6379/0
-      - SECRET_KEY=${SECRET_KEY}
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-change-me-in-production}
       - MAX_UPLOAD_MB=${MAX_UPLOAD_MB:-200}
     volumes:
       - uploads:/app/uploads
