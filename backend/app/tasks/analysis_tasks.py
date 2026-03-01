@@ -19,9 +19,12 @@ def analyze_pcap(self, capture_id: int, file_path: str) -> None:
 
     from app.analyzers.c2_beacon import analyze_c2_beaconing
     from app.analyzers.cleartext import analyze_cleartext_credentials
+    from app.analyzers.connection_failures import analyze_connection_failures
+    from app.analyzers.dns_health import analyze_dns_health
     from app.analyzers.dns_tunnel import analyze_dns_tunneling
     from app.analyzers.exfil import analyze_exfiltration
     from app.analyzers.ntlm import analyze_ntlm
+    from app.analyzers.tls_inspect import analyze_tls_inspection
     from app.database import SessionLocal
     from app.models import Capture
 
@@ -46,39 +49,66 @@ def analyze_pcap(self, capture_id: int, file_path: str) -> None:
         packet_count = len(packets)
         logger.info("Loaded %d packets for capture %d", packet_count, capture_id)
 
-        c2_results = analyze_c2_beaconing(packets)
-        dns_results = analyze_dns_tunneling(packets)
-        ntlm_results = analyze_ntlm(packets)
-        cred_results = analyze_cleartext_credentials(packets)
+        # ── Threat hunting analyzers ──────────────────────────────────────────
+        c2_results    = analyze_c2_beaconing(packets)
+        dns_results   = analyze_dns_tunneling(packets)
+        ntlm_results  = analyze_ntlm(packets)
+        cred_results  = analyze_cleartext_credentials(packets)
         exfil_results = analyze_exfiltration(packets)
+
+        # ── Network troubleshooting analyzers ─────────────────────────────────
+        conn_results  = analyze_connection_failures(packets)
+        dns_health    = analyze_dns_health(packets)
+        tls_results   = analyze_tls_inspection(packets)
 
         # Strip `password_raw` from in-DB results — it lives only in JSON export
         safe_creds = [
             {k: v for k, v in c.items() if k != "password_raw"} for c in cred_results
         ]
 
+        conn_summary = conn_results.get("summary", {})
+        dns_health_summary = dns_health.get("summary", {})
+        tls_summary = tls_results.get("summary", {})
+
         capture.results = json.dumps(
             {
-                "c2_beaconing": c2_results,
-                "dns_tunneling": dns_results,
-                "ntlm_hashes": ntlm_results,
+                # ── Threat hunting ────────────────────────────────────────────
+                "c2_beaconing":          c2_results,
+                "dns_tunneling":         dns_results,
+                "ntlm_hashes":           ntlm_results,
                 "cleartext_credentials": safe_creds,
-                "exfiltration": exfil_results,
-                "packet_count": packet_count,
-                # Summary counts for the dashboard header
+                "exfiltration":          exfil_results,
+                # ── Troubleshooting ───────────────────────────────────────────
+                "connection_failures":   conn_results,
+                "dns_health":            dns_health,
+                "tls_inspection":        tls_results,
+                "packet_count":          packet_count,
+                # ── Summary counts for the dashboard header ───────────────────
                 "summary": {
-                    "c2_beacon_count": len(c2_results),
+                    # Threat hunting
+                    "c2_beacon_count":         len(c2_results),
                     "dns_tunnel_domain_count": len(dns_results.get("tunnel_domains", [])),
                     "ntlm_hash_count": sum(
                         1 for r in ntlm_results if r.get("type") == "AUTHENTICATE"
                     ),
                     "cleartext_cred_count": len(cred_results),
-                    "exfil_flow_count": len(exfil_results),
+                    "exfil_flow_count":     len(exfil_results),
+                    # Troubleshooting
+                    "blocked_dest_count": (
+                        conn_summary.get("rst_destination_count", 0)
+                        + conn_summary.get("dropped_destination_count", 0)
+                        + conn_summary.get("firewall_icmp_count", 0)
+                    ),
+                    "dns_failure_count":  dns_health_summary.get("total_failures", 0),
+                    "tls_issue_count": (
+                        tls_summary.get("intercepted_count", 0)
+                        + tls_summary.get("alert_count", 0)
+                        + tls_summary.get("mismatch_count", 0)
+                    ),
                 },
             },
             default=str,
         )
-        # Store raw creds separately for the export endpoint
         capture.status = "complete"
         capture.packet_count = packet_count
         capture.completed_at = datetime.now(timezone.utc)
