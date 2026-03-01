@@ -104,6 +104,26 @@ export default function Dashboard() {
   const summary = capture.results?.summary || {}
   const results = capture.results || {}
 
+  const [exporting, setExporting] = useState(false)
+
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const { data } = await api.get(`/captures/${id}/export`)
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      a.href     = url
+      a.download = `pcap-analysis-${id}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      // error is handled globally by the axios interceptor (401 → redirect)
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Top bar */}
@@ -116,17 +136,20 @@ export default function Dashboard() {
               {capture.completed_at && ` · ${new Date(capture.completed_at).toLocaleString()}`}
             </p>
           </div>
-          <a
-            href={`/api/captures/${id}/export`}
-            download
-            className="flex items-center gap-2 text-sm bg-gray-800 hover:bg-gray-700 text-gray-200 px-4 py-2 rounded-lg transition border border-gray-700"
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            className="flex items-center gap-2 text-sm bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-gray-200 px-4 py-2 rounded-lg transition border border-gray-700"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Export JSON
-          </a>
+            {exporting
+              ? <span className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+              : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+            }
+            {exporting ? 'Exporting…' : 'Export JSON'}
+          </button>
         </div>
 
         {/* Tab groups */}
