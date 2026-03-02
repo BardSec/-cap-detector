@@ -40,6 +40,7 @@ export default function Dashboard() {
   const [capture, setCapture] = useState(null)
   const [activeTab, setActiveTab] = useState('c2')
   const [error, setError] = useState(null)
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     let interval
@@ -103,8 +104,6 @@ export default function Dashboard() {
 
   const summary = capture.results?.summary || {}
   const results = capture.results || {}
-
-  const [exporting, setExporting] = useState(false)
 
   const handleExport = async () => {
     setExporting(true)
